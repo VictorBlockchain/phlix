@@ -75,7 +75,9 @@ export default function Home() {
       setShouldAutoPlay(true)
 
       // Scroll to top to show the video player
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
     }
   }
   const lastScrollY = useRef(0)
@@ -129,6 +131,8 @@ export default function Home() {
 
   // Handle header visibility on scroll
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY
       if (currentScrollY > lastScrollY.current && currentScrollY > 80) {
@@ -154,6 +158,8 @@ export default function Home() {
 
   // Listen for random video play events from mobile nav
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     const handlePlayRandomVideo = () => {
       playRandomVideo()
     }

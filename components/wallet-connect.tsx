@@ -29,6 +29,8 @@ export function WalletConnect({ className = "", iconOnly = false }: WalletConnec
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (typeof document === "undefined") return
+
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false)
@@ -52,7 +54,7 @@ export function WalletConnect({ className = "", iconOnly = false }: WalletConnec
   }
 
   const handleCopyAddress = async () => {
-    if (walletAddress) {
+    if (walletAddress && typeof navigator !== "undefined" && navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(walletAddress)
         setAddressCopied(true)

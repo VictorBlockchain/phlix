@@ -144,9 +144,11 @@ export default function ProfilePage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   const copyWalletAddress = () => {
-    navigator.clipboard.writeText(mockUser.walletAddress)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(mockUser.walletAddress)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
   }
 
   // Tab labels for accessibility and tooltips

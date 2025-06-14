@@ -21,6 +21,8 @@ export default function Header({ visible }: HeaderProps) {
 
   // Track scroll position for parallax effect
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     const handleScroll = () => {
       setScrollPosition(window.scrollY)
     }

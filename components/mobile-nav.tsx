@@ -18,6 +18,8 @@ export default function MobileNav() {
 
   // Function to handle middle button click
   const handleMiddleButtonClick = () => {
+    if (typeof window === "undefined") return
+
     if (isOnHomePage) {
       // If on home page, trigger random video play
       const event = new CustomEvent('playRandomVideo')
@@ -72,7 +74,7 @@ export default function MobileNav() {
             if (item.onClick) {
               e.preventDefault()
               item.onClick()
-            } else if (isExternalLink) {
+            } else if (isExternalLink && typeof window !== "undefined") {
               e.preventDefault()
               window.open(item.href, '_blank', 'noopener,noreferrer')
             }

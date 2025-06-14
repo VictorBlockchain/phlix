@@ -91,6 +91,18 @@ export default function CreatePage() {
   // Get video metadata
   const getVideoMetadata = (file: File): Promise<VideoMetadata> => {
     return new Promise((resolve) => {
+      if (typeof document === "undefined") {
+        // Fallback for SSR
+        resolve({
+          duration: 0,
+          size: file.size,
+          type: file.type,
+          width: 0,
+          height: 0,
+        })
+        return
+      }
+
       const video = document.createElement('video')
       video.preload = 'metadata'
 

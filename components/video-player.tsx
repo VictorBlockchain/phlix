@@ -102,7 +102,7 @@ export default function VideoPlayer({ videoSrc, poster, title, autoPlay = false 
   }
 
   const toggleFullscreen = () => {
-    if (!playerRef.current) return
+    if (!playerRef.current || typeof document === "undefined") return
 
     if (!document.fullscreenElement) {
       playerRef.current
