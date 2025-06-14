@@ -65,6 +65,7 @@ export default function Home() {
   const [featuredVideo, setFeaturedVideo] = useState<Video | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false)
+  const [showAutoPlayNotification, setShowAutoPlayNotification] = useState(false)
 
   // Function to play a random video
   const playRandomVideo = () => {
@@ -78,6 +79,33 @@ export default function Home() {
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
+    }
+  }
+
+  // Function to auto-play next video (excluding current one)
+  const playNextRandomVideo = () => {
+    if (videos.length <= 1) return // Need at least 2 videos for auto-play
+
+    // Filter out the current video to avoid replaying the same one
+    const availableVideos = videos.filter(video => video.id !== featuredVideo?.id)
+
+    if (availableVideos.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availableVideos.length)
+      const nextVideo = availableVideos[randomIndex]
+
+      // Show auto-play notification
+      setShowAutoPlayNotification(true)
+
+      // Set the new video with auto-play enabled
+      setFeaturedVideo(nextVideo)
+      setShouldAutoPlay(true)
+
+      // Hide notification after 3 seconds
+      setTimeout(() => {
+        setShowAutoPlayNotification(false)
+      }, 3000)
+
+      console.log(`Auto-playing: ${nextVideo.title}`)
     }
   }
   const lastScrollY = useRef(0)
@@ -247,7 +275,17 @@ export default function Home() {
           <div className="absolute -top-20 -left-20 w-64 h-64 rounded-full bg-purple-500/10 blur-3xl"></div>
           <div className="absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-cyan-500/10 blur-3xl"></div>
 
-          <div className="aspect-video max-h-[80vh] w-full mx-auto">
+          <div className="aspect-video max-h-[80vh] w-full mx-auto relative">
+            {/* Auto-play notification */}
+            {showAutoPlayNotification && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-cyan-500/90 to-blue-500/90 backdrop-blur-sm text-white px-4 py-2 rounded-full shadow-lg shadow-cyan-500/20 animate-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium">Auto-playing next video...</span>
+                </div>
+              </div>
+            )}
+
             {isLoading ? (
               <div className="w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center">
                 <div className="text-center">
@@ -261,6 +299,7 @@ export default function Home() {
                 poster={featuredVideo.thumbnail_url || "/placeholder.svg?height=720&width=1280"}
                 title={`Featured: ${featuredVideo.title}`}
                 autoPlay={shouldAutoPlay}
+                onVideoEnd={playNextRandomVideo}
               />
             ) : (
               <div className="w-full h-full bg-zinc-800 rounded-lg flex items-center justify-center">

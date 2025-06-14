@@ -10,9 +10,10 @@ interface VideoPlayerProps {
   poster?: string
   title?: string
   autoPlay?: boolean
+  onVideoEnd?: () => void
 }
 
-export default function VideoPlayer({ videoSrc, poster, title, autoPlay = false }: VideoPlayerProps) {
+export default function VideoPlayer({ videoSrc, poster, title, autoPlay = false, onVideoEnd }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [volume, setVolume] = useState(1)
@@ -41,6 +42,10 @@ export default function VideoPlayer({ videoSrc, poster, title, autoPlay = false 
 
     const handleEnded = () => {
       setIsPlaying(false)
+      // Call the callback to trigger auto-play of next video
+      if (onVideoEnd) {
+        onVideoEnd()
+      }
     }
 
     video.addEventListener("timeupdate", handleTimeUpdate)

@@ -17,15 +17,13 @@ export function WalletConnect({ className = "", iconOnly = false }: WalletConnec
   const [isLoading, setIsLoading] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [addressCopied, setAddressCopied] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Debug logging
-  console.log("WalletConnect render:", {
-    profile,
-    walletAddress,
-    iconOnly,
-    avatarUrl: profile ? getAvatarUrl(profile, 36) : 'no profile'
-  })
+  // Ensure component only renders on client to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -74,13 +72,20 @@ export function WalletConnect({ className = "", iconOnly = false }: WalletConnec
     return null
   }
 
-  // Only show avatar when wallet is connected
+  // Prevent hydration mismatch by only rendering after mount
+  if (!isMounted) {
+    return (
+      <div className={`hidden md:block ${className}`}>
+        <div className="w-9 h-9 rounded-full bg-zinc-800 animate-pulse"></div>
+      </div>
+    )
+  }
+
+  // Show connect button when no wallet is connected
   if (!walletAddress) {
     return (
       <div className={`hidden md:block ${className}`}>
-        <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-400">
-          No Wallet
-        </div>
+        <WalletMultiButton className="!h-9 !text-sm !bg-gradient-to-r !from-blue-500 !to-purple-600 hover:!from-blue-600 hover:!to-purple-700 !border-0 !rounded-md !px-4" />
       </div>
     )
   }

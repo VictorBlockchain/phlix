@@ -1,7 +1,9 @@
 "use client"
-import { Home, Play, Upload, User, ArrowLeftRight, Compass } from "lucide-react"
+import { Home, Play, Upload, User, ArrowLeftRight, Compass, Wallet } from "lucide-react"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useWallet } from "@solana/wallet-adapter-react"
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui"
 
 interface NavItem {
   label: string
@@ -14,7 +16,14 @@ interface NavItem {
 export default function MobileNav() {
   const pathname = usePathname()
   const [pressedButton, setPressedButton] = useState<string | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
   const isOnHomePage = pathname === "/"
+  const { connected } = useWallet()
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Function to handle middle button click
   const handleMiddleButtonClick = () => {
@@ -30,7 +39,8 @@ export default function MobileNav() {
     }
   }
 
-  const navItems: NavItem[] = [
+  // Navigation items change based on wallet connection status
+  const navItems: NavItem[] = connected ? [
     {
       label: "Swap",
       href: "https://pump.fun",
@@ -58,6 +68,24 @@ export default function MobileNav() {
       href: "/profile",
       icon: User,
     },
+  ] : [
+    {
+      label: "Discover",
+      href: "/discover",
+      icon: Compass,
+    },
+    {
+      label: isOnHomePage ? "Play" : "Home",
+      href: "/",
+      icon: isOnHomePage ? Play : Home,
+      highlight: true,
+      onClick: handleMiddleButtonClick,
+    },
+    {
+      label: "Connect",
+      href: "#",
+      icon: Wallet,
+    },
   ]
 
   return (
@@ -66,7 +94,8 @@ export default function MobileNav() {
       <nav className="flex justify-around items-end h-16 px-2 relative">
         {navItems.map((item, index) => {
           const isActive = pathname === item.href
-          const isMiddle = index === 2 // Middle button is now at index 2
+          const isMiddle = connected ? index === 2 : index === 1 // Middle button position changes based on connection
+          const isConnectButton = !connected && item.label === "Connect"
 
           // Handle different types of clicks
           const isExternalLink = item.href.startsWith('http')
@@ -78,6 +107,22 @@ export default function MobileNav() {
               e.preventDefault()
               window.open(item.href, '_blank', 'noopener,noreferrer')
             }
+          }
+
+          // Special handling for connect wallet button
+          if (isConnectButton) {
+            return (
+              <div key={`connect-${index}`} className="flex flex-col items-center justify-center w-full h-full">
+                <div className="relative">
+                  {isMounted ? (
+                    <WalletMultiButton className="!h-8 !text-xs !bg-gradient-to-r !from-blue-500 !to-purple-600 hover:!from-blue-600 hover:!to-purple-700 !border-0 !rounded-md !px-3 !py-1" />
+                  ) : (
+                    <div className="h-8 w-16 bg-zinc-700 rounded-md animate-pulse"></div>
+                  )}
+                </div>
+                <span className="text-xs text-zinc-400 mt-1">Connect</span>
+              </div>
+            )
           }
 
           return (

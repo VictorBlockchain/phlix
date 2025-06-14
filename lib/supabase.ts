@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from './database.types'
+import { FILE_LIMITS, SUPPORTED_FORMATS, getFileSizeLimit, formatFileSize, mbToBytes } from './config'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,8 +30,19 @@ export const uploadFile = async (
   bucket: keyof typeof STORAGE_BUCKETS,
   path: string,
   file: File,
-  options?: { cacheControl?: string; upsert?: boolean }
+  options?: { cacheControl?: string; upsert?: boolean; maxSizeMB?: number }
 ) => {
+  // Use configuration-based size limits
+  const maxSizeMB = options?.maxSizeMB || getFileSizeLimit(file.type)
+  const maxSizeBytes = mbToBytes(maxSizeMB)
+
+  // Check file size
+  if (file.size > maxSizeBytes) {
+    const fileType = file.type.startsWith('video/') ? 'video' :
+                    file.type.startsWith('image/') ? 'image' : 'file'
+    throw new Error(`${fileType} size (${formatFileSize(file.size)}) exceeds maximum allowed size of ${maxSizeMB}MB`)
+  }
+
   const { data, error } = await supabase.storage
     .from(STORAGE_BUCKETS[bucket])
     .upload(path, file, {
@@ -39,6 +51,10 @@ export const uploadFile = async (
     })
 
   if (error) {
+    // Provide more helpful error messages
+    if (error.message.includes('exceeded the maximum allowed size')) {
+      throw new Error(`File too large. Maximum size allowed is ${maxSizeMB}MB. Please compress your file and try again.`)
+    }
     throw new Error(`Upload failed: ${error.message}`)
   }
 
@@ -61,6 +77,107 @@ export const deleteFile = async (bucket: keyof typeof STORAGE_BUCKETS, path: str
   if (error) {
     throw new Error(`Delete failed: ${error.message}`)
   }
+}
+
+// Enhanced upload with file size checking and progress
+export const uploadVideoFile = async (
+  bucket: keyof typeof STORAGE_BUCKETS,
+  path: string,
+  file: File,
+  options?: {
+    cacheControl?: string
+    upsert?: boolean
+    onProgress?: (progress: number) => void
+    maxSizeMB?: number
+  }
+) => {
+  const maxSizeMB = options?.maxSizeMB || FILE_LIMITS.VIDEO_MAX_SIZE_MB
+  const maxSizeBytes = mbToBytes(maxSizeMB)
+
+  // Check file size
+  if (file.size > maxSizeBytes) {
+    throw new Error(`File size (${formatFileSize(file.size)}) exceeds maximum allowed size of ${maxSizeMB}MB. Please compress your video or choose a smaller file.`)
+  }
+
+  // Check file type
+  if (!file.type.startsWith('video/')) {
+    throw new Error('Please select a valid video file')
+  }
+
+  // Check if format is supported
+  if (!SUPPORTED_FORMATS.VIDEO.includes(file.type)) {
+    throw new Error(`Unsupported video format. Please use: ${SUPPORTED_FORMATS.VIDEO.map(f => f.split('/')[1].toUpperCase()).join(', ')}`)
+  }
+
+  // Use regular upload for all files under 50MB
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKETS[bucket])
+    .upload(path, file, {
+      cacheControl: options?.cacheControl || '3600',
+      upsert: options?.upsert || false
+    })
+
+  if (error) {
+    // Provide more specific error messages
+    if (error.message.includes('exceeded the maximum allowed size')) {
+      throw new Error(`File too large. Maximum size allowed is ${maxSizeMB}MB. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`)
+    }
+    throw new Error(`Upload failed: ${error.message}`)
+  }
+
+  options?.onProgress?.(100)
+  return data
+
+}
+
+// Enhanced file validation with detailed error info
+export const validateFile = (file: File, maxSizeMB?: number): {
+  valid: boolean
+  error?: string
+  fileType: 'video' | 'image' | 'file'
+  maxSize: number
+} => {
+  const fileType = file.type.startsWith('video/') ? 'video' :
+                  file.type.startsWith('image/') ? 'image' : 'file'
+
+  const maxSize = maxSizeMB || getFileSizeLimit(file.type)
+  const maxSizeBytes = mbToBytes(maxSize)
+
+  // Check file type for videos
+  if (fileType === 'video' && !file.type.startsWith('video/')) {
+    return {
+      valid: false,
+      error: 'Please select a valid video file',
+      fileType,
+      maxSize
+    }
+  }
+
+  // Check file size
+  if (file.size > maxSizeBytes) {
+    return {
+      valid: false,
+      error: `${fileType} size (${formatFileSize(file.size)}) exceeds maximum allowed size of ${maxSize}MB`,
+      fileType,
+      maxSize
+    }
+  }
+
+  // Check supported formats
+  const supportedFormats = fileType === 'video' ? SUPPORTED_FORMATS.VIDEO :
+                          fileType === 'image' ? SUPPORTED_FORMATS.IMAGE : []
+
+  if (supportedFormats.length > 0 && !supportedFormats.includes(file.type)) {
+    const formatNames = supportedFormats.map(f => f.split('/')[1].toUpperCase()).join(', ')
+    return {
+      valid: false,
+      error: `Unsupported ${fileType} format. Please use: ${formatNames}`,
+      fileType,
+      maxSize
+    }
+  }
+
+  return { valid: true, fileType, maxSize }
 }
 
 // Real-time subscriptions

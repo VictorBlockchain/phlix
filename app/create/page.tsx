@@ -28,9 +28,11 @@ import {
   Zap
 } from "lucide-react"
 import Header from "@/components/header"
-import { supabase, uploadFile, getPublicUrl, createVideo } from "@/lib/supabase"
+import { supabase, uploadFile, getPublicUrl, createVideo, validateFile } from "@/lib/supabase"
 import { useUser } from "@/hooks/use-user"
 import { toast } from "sonner"
+import { FileSizeErrorModal } from "@/components/file-size-error-modal"
+import { FILE_LIMITS } from "@/lib/config"
 
 // Video categories from discover page
 const VIDEO_CATEGORIES = {
@@ -84,6 +86,13 @@ export default function CreatePage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [showNftModal, setShowNftModal] = useState(false)
+  const [showFileSizeError, setShowFileSizeError] = useState(false)
+  const [fileSizeError, setFileSizeError] = useState<{
+    fileName: string
+    fileSize: number
+    maxSize: number
+    fileType: 'video' | 'image' | 'file'
+  } | null>(null)
 
   const { profile, isConnected, walletAddress } = useUser()
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -126,6 +135,19 @@ export default function CreatePage() {
     const file = acceptedFiles[0]
     if (!file) return
 
+    // Validate file size and format
+    const validation = validateFile(file, FILE_LIMITS.VIDEO_MAX_SIZE_MB)
+    if (!validation.valid) {
+      setFileSizeError({
+        fileName: file.name,
+        fileSize: file.size,
+        maxSize: validation.maxSize,
+        fileType: validation.fileType
+      })
+      setShowFileSizeError(true)
+      return
+    }
+
     try {
       const metadata = await getVideoMetadata(file)
       const previewUrl = URL.createObjectURL(file)
@@ -154,7 +176,7 @@ export default function CreatePage() {
     accept: {
       'video/*': ['.mp4', '.webm', '.mov', '.avi']
     },
-    maxSize: 2 * 1024 * 1024 * 1024, // 2GB
+    maxSize: FILE_LIMITS.VIDEO_MAX_SIZE_MB * 1024 * 1024, // Use configurable limit
     multiple: false
   })
 
@@ -162,6 +184,19 @@ export default function CreatePage() {
   const onThumbnailDropAccepted = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
     if (!file) return
+
+    // Validate file size and format
+    const validation = validateFile(file, FILE_LIMITS.THUMBNAIL_MAX_SIZE_MB)
+    if (!validation.valid) {
+      setFileSizeError({
+        fileName: file.name,
+        fileSize: file.size,
+        maxSize: validation.maxSize,
+        fileType: validation.fileType
+      })
+      setShowFileSizeError(true)
+      return
+    }
 
     // Check image dimensions (recommended: 1280x720 for 16:9 aspect ratio)
     const img = new Image()
@@ -194,7 +229,7 @@ export default function CreatePage() {
     accept: {
       'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif']
     },
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: FILE_LIMITS.THUMBNAIL_MAX_SIZE_MB * 1024 * 1024, // Use configurable limit
     multiple: false
   })
 
@@ -411,7 +446,7 @@ export default function CreatePage() {
                         <div className="text-sm text-zinc-400">
                           <span className="text-purple-400">Upload a file</span> or drag and drop
                         </div>
-                        <p className="text-xs text-zinc-500">PNG, JPG, WebP up to 10MB</p>
+                        <p className="text-xs text-zinc-500">PNG, JPG, WebP up to {FILE_LIMITS.THUMBNAIL_MAX_SIZE_MB}MB</p>
                       </div>
                     )}
                   </div>
@@ -468,7 +503,15 @@ export default function CreatePage() {
                         <div className="text-sm text-zinc-400">
                           <span className="text-purple-400">Upload a file</span> or drag and drop
                         </div>
-                        <p className="text-xs text-zinc-500">MP4, WebM, MOV up to 2GB</p>
+                        <p className="text-xs text-zinc-500">MP4, WebM, MOV up to {FILE_LIMITS.VIDEO_MAX_SIZE_MB}MB</p>
+                        <div className="mt-2 p-2 bg-cyan-900/20 rounded-lg border border-cyan-500/20">
+                          <p className="text-xs text-cyan-300 font-medium mb-1">💡 Upload Tips:</p>
+                          <ul className="text-xs text-zinc-400 space-y-0.5">
+                            <li>• Keep videos under {FILE_LIMITS.VIDEO_MAX_SIZE_MB}MB for best results</li>
+                            <li>• Use 720p resolution for optimal quality/size balance</li>
+                            <li>• H.264 codec provides best compression</li>
+                          </ul>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -590,15 +633,85 @@ export default function CreatePage() {
             <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-4">
               <h3 className="font-medium mb-3 flex items-center">
                 <AlertCircle className="mr-2 h-5 w-5 text-blue-400" />
-                Upload Tips
+                Upload Guidelines
               </h3>
               <ul className="space-y-2 text-sm text-zinc-400">
                 <li>• Recommended video formats: MP4, WebM, MOV</li>
                 <li>• Optimal thumbnail size: 1280x720px (16:9 aspect ratio)</li>
-                <li>• Maximum file size: 2GB for videos, 10MB for thumbnails</li>
+                <li>• Maximum video size: <span className="text-cyan-400 font-medium">{FILE_LIMITS.VIDEO_MAX_SIZE_MB}MB</span></li>
+                <li>• Maximum thumbnail size: <span className="text-cyan-400 font-medium">{FILE_LIMITS.THUMBNAIL_MAX_SIZE_MB}MB</span></li>
                 <li>• Videos will be publicly accessible unless marked private</li>
-                <li>• NFT minting feature coming soon!</li>
+                <li>• Use H.264 codec for best compression and compatibility</li>
               </ul>
+            </div>
+
+            {/* Storage Upgrade Section */}
+            <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/20 rounded-lg border border-amber-500/30 p-6 relative overflow-hidden">
+              {/* Decorative elements */}
+              <div className="absolute -top-10 -right-10 w-20 h-20 rounded-full bg-amber-500/10 blur-2xl"></div>
+              <div className="absolute -bottom-10 -left-10 w-20 h-20 rounded-full bg-orange-500/10 blur-2xl"></div>
+
+              <div className="relative">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 p-0.5 shadow-lg shadow-amber-500/30 flex-shrink-0">
+                    <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
+                      <Zap className="h-6 w-6 text-amber-400" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent mb-2">
+                      Need More Storage?
+                    </h3>
+                    <p className="text-zinc-300 text-sm mb-3">
+                      Upgrade your storage limits with Phlix tokens and upload larger, higher-quality videos!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-amber-500/20">
+                    <div className="text-xs text-amber-400 font-medium mb-1">CURRENT PLAN</div>
+                    <div className="text-sm text-white">Free Tier</div>
+                    <div className="text-xs text-zinc-400">Up to {FILE_LIMITS.VIDEO_MAX_SIZE_MB}MB per video</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-lg p-3 border border-amber-500/30">
+                    <div className="text-xs text-amber-400 font-medium mb-1">PREMIUM PLAN</div>
+                    <div className="text-sm text-white">Up to 500MB per video</div>
+                    <div className="text-xs text-amber-400">+ 4K resolution support</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 flex items-center justify-center">
+                      <span className="text-xs font-bold text-black">₱</span>
+                    </div>
+                    <span className="text-sm text-zinc-300">Pay with Phlix tokens</span>
+                  </div>
+                  <Button
+                    disabled
+                    className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-black font-medium px-6 py-2 rounded-xl shadow-lg shadow-amber-500/20"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Coming Soon
+                  </Button>
+                </div>
+
+                <div className="mt-3 p-3 bg-cyan-900/20 rounded-lg border border-cyan-500/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-4 h-4 rounded-full bg-cyan-400 flex items-center justify-center">
+                      <span className="text-xs text-black">!</span>
+                    </div>
+                    <span className="text-xs font-medium text-cyan-300">Early Access Benefits</span>
+                  </div>
+                  <ul className="text-xs text-zinc-400 space-y-0.5 ml-6">
+                    <li>• Priority upload processing</li>
+                    <li>• Advanced analytics dashboard</li>
+                    <li>• Custom NFT collection features</li>
+                    <li>• Exclusive creator badges</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -658,6 +771,21 @@ export default function CreatePage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* File Size Error Modal */}
+        {fileSizeError && (
+          <FileSizeErrorModal
+            isOpen={showFileSizeError}
+            onClose={() => {
+              setShowFileSizeError(false)
+              setFileSizeError(null)
+            }}
+            fileName={fileSizeError.fileName}
+            fileSize={fileSizeError.fileSize}
+            maxSize={fileSizeError.maxSize}
+            fileType={fileSizeError.fileType}
+          />
+        )}
       </div>
     </div>
   )
